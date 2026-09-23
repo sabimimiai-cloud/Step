@@ -1,0 +1,7 @@
+{
+  "name": "StepFlow",
+  "description": "Production-ready mobile step counter using device motion sensors, real-time gait detection, daily tracking, and clean fitness analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

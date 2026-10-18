@@ -458,6 +458,15 @@ export class StepDetectionEngine {
   public getState(): StepEngineState {
     return {
       sensorStatus: this.status,
+      providerType: 'web_accelerometer',
+      capabilities: {
+        supportsBackgroundTracking: false,
+        supportsHardwarePedometer: false,
+        supportsHistoricalCoprocessorQuery: false,
+        sensorName: 'Web DeviceMotionEvent (Accelerometer)',
+        platformDescription: 'Browser Accelerometer Kinematics (Foreground Only)',
+        limitationNotice: 'Web browser does not support locked/background pedometer counting.',
+      },
       isSupported: this.status !== 'unsupported',
       permissionState: this.permissionState,
       isListening: this.isListening,

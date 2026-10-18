@@ -2,9 +2,8 @@ import { DayRecord, HistoryStats, UserProfile } from '../types';
 import { calculateEstimations, getLocalDateKey } from '../utils/calculations';
 
 const STORAGE_KEYS = {
-  USER_PROFILE: 'stepflow_profile_v1',
-  DAY_RECORDS: 'stepflow_history_v1',
-  CURRENT_DAY: 'stepflow_current_day_v1',
+  USER_PROFILE: 'stepflow_profile_v2',
+  DAY_RECORDS: 'stepflow_history_v2',
 };
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -15,7 +14,7 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 /**
- * Retrieves the stored user profile or defaults
+ * Retrieves user profile
  */
 export function getStoredProfile(): UserProfile {
   try {
@@ -28,7 +27,7 @@ export function getStoredProfile(): UserProfile {
 }
 
 /**
- * Saves user profile updates (e.g. goal change)
+ * Saves user profile updates
  */
 export function saveProfile(profile: UserProfile): void {
   try {
@@ -39,15 +38,14 @@ export function saveProfile(profile: UserProfile): void {
 }
 
 /**
- * Retrieves all stored historical day records keyed by YYYY-MM-DD
+ * Retrieves all stored historical day records.
+ * STRICTLY returns only authentic, measured records. Does NOT auto-seed fake records.
  */
 export function getAllDayRecords(): Record<string, DayRecord> {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DAY_RECORDS);
     if (!raw) {
-      // Seed with initial realistic baseline for previous days so graphs aren't barren
-      // while keeping today strictly untouched
-      return seedInitialHistory();
+      return {};
     }
     return JSON.parse(raw);
   } catch {
@@ -56,50 +54,8 @@ export function getAllDayRecords(): Record<string, DayRecord> {
 }
 
 /**
- * Seeds previous 14 days of realistic walking history on first launch,
- * leaving today's date strictly at 0 steps until user actually moves.
- */
-function seedInitialHistory(): Record<string, DayRecord> {
-  const records: Record<string, DayRecord> = {};
-  const profile = DEFAULT_PROFILE;
-  const now = new Date();
-
-  // Seed previous 14 days (excluding today)
-  for (let i = 1; i <= 14; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateKey = getLocalDateKey(d);
-    
-    // Vary steps around goal realistically (e.g. 6,800 to 11,400)
-    const baseVariance = Math.sin(i * 1.3) * 2200;
-    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-    const weekendBoost = isWeekend ? 1500 : 0;
-    const steps = Math.max(3500, Math.round(8800 + baseVariance + weekendBoost));
-    
-    const est = calculateEstimations(steps, profile.strideLengthMeters, profile.weightKg);
-
-    records[dateKey] = {
-      date: dateKey,
-      steps,
-      goal: profile.dailyGoal,
-      distanceKm: est.distanceKm,
-      caloriesKcal: est.caloriesKcal,
-      walkingMinutes: est.durationMinutes,
-      updatedAt: d.getTime(),
-    };
-  }
-
-  try {
-    localStorage.setItem(STORAGE_KEYS.DAY_RECORDS, JSON.stringify(records));
-  } catch (err) {
-    console.error('Failed to seed history', err);
-  }
-
-  return records;
-}
-
-/**
- * Gets or initializes the record for today
+ * Gets or initializes today's record.
+ * Starts strictly at 0 steps until physical sensor movements are detected.
  */
 export function getTodayRecord(profile: UserProfile = DEFAULT_PROFILE): DayRecord {
   const todayKey = getLocalDateKey();
@@ -109,7 +65,6 @@ export function getTodayRecord(profile: UserProfile = DEFAULT_PROFILE): DayRecor
     return allRecords[todayKey];
   }
 
-  // New day entry
   const newToday: DayRecord = {
     date: todayKey,
     steps: 0,
@@ -118,20 +73,27 @@ export function getTodayRecord(profile: UserProfile = DEFAULT_PROFILE): DayRecor
     caloriesKcal: 0,
     walkingMinutes: 0,
     updatedAt: Date.now(),
+    isDemoData: false,
   };
 
   allRecords[todayKey] = newToday;
-  try {
-    localStorage.setItem(STORAGE_KEYS.DAY_RECORDS, JSON.stringify(allRecords));
-  } catch (err) {
-    console.error('Failed to save today record', err);
-  }
-
+  saveAllDayRecords(allRecords);
   return newToday;
 }
 
 /**
- * Updates today's step count in persistent storage
+ * Saves all records to localStorage
+ */
+function saveAllDayRecords(records: Record<string, DayRecord>): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DAY_RECORDS, JSON.stringify(records));
+  } catch (err) {
+    console.error('Failed to save day records', err);
+  }
+}
+
+/**
+ * Updates today's authentic measured step count in persistent storage
  */
 export function updateTodaySteps(
   steps: number,
@@ -148,6 +110,7 @@ export function updateTodaySteps(
     caloriesKcal: 0,
     walkingMinutes: 0,
     updatedAt: Date.now(),
+    isDemoData: false,
   };
 
   const newSteps = steps;
@@ -162,16 +125,78 @@ export function updateTodaySteps(
     caloriesKcal: est.caloriesKcal,
     walkingMinutes: newWalkingMinutes,
     updatedAt: Date.now(),
+    isDemoData: false, // Authentic measured sensor steps
   };
 
   allRecords[todayKey] = updated;
-  try {
-    localStorage.setItem(STORAGE_KEYS.DAY_RECORDS, JSON.stringify(allRecords));
-  } catch (err) {
-    console.error('Failed to update today steps', err);
+  saveAllDayRecords(allRecords);
+  return updated;
+}
+
+/**
+ * Explicitly loads demo benchmark data ONLY when requested by user for UI inspection.
+ * Every record is explicitly tagged with `isDemoData: true`.
+ */
+export function loadDemoBenchmarkData(profile: UserProfile = DEFAULT_PROFILE): void {
+  const records = getAllDayRecords();
+  const now = new Date();
+
+  // Seed previous 7 days with explicit demo tag
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateKey = getLocalDateKey(d);
+
+    const steps = [8420, 10250, 7890, 11400, 9300, 6800, 10800][i - 1] || 8500;
+    const est = calculateEstimations(steps, profile.strideLengthMeters, profile.weightKg);
+
+    records[dateKey] = {
+      date: dateKey,
+      steps,
+      goal: profile.dailyGoal,
+      distanceKm: est.distanceKm,
+      caloriesKcal: est.caloriesKcal,
+      walkingMinutes: est.durationMinutes,
+      updatedAt: d.getTime(),
+      isDemoData: true, // EXPLICITLY LABELED AS DEMO DATA
+    };
   }
 
-  return updated;
+  saveAllDayRecords(records);
+}
+
+/**
+ * Clears all demo data, leaving only real measurements
+ */
+export function purgeDemoData(): void {
+  const records = getAllDayRecords();
+  const cleaned: Record<string, DayRecord> = {};
+
+  for (const [key, record] of Object.entries(records)) {
+    if (!record.isDemoData) {
+      cleaned[key] = record;
+    }
+  }
+
+  saveAllDayRecords(cleaned);
+}
+
+/**
+ * Resets all history to 0
+ */
+export function resetAllHistory(profile: UserProfile = DEFAULT_PROFILE): void {
+  const todayKey = getLocalDateKey();
+  const resetToday: DayRecord = {
+    date: todayKey,
+    steps: 0,
+    goal: profile.dailyGoal,
+    distanceKm: 0,
+    caloriesKcal: 0,
+    walkingMinutes: 0,
+    updatedAt: Date.now(),
+    isDemoData: false,
+  };
+  saveAllDayRecords({ [todayKey]: resetToday });
 }
 
 /**
@@ -188,7 +213,7 @@ export function getHistoryStats(profile: UserProfile = DEFAULT_PROFILE): History
   const todayRecord = allRecords[todayKey] || getTodayRecord(profile);
   const yesterdayRecord = allRecords[yesterdayKey];
 
-  // Build sequential 7 days (including today)
+  // Build sequential 7 days
   const sevenDays: DayRecord[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -205,6 +230,7 @@ export function getHistoryStats(profile: UserProfile = DEFAULT_PROFILE): History
         caloriesKcal: 0,
         walkingMinutes: 0,
         updatedAt: d.getTime(),
+        isDemoData: false,
       });
     }
   }
@@ -226,22 +252,29 @@ export function getHistoryStats(profile: UserProfile = DEFAULT_PROFILE): History
         caloriesKcal: 0,
         walkingMinutes: 0,
         updatedAt: d.getTime(),
+        isDemoData: false,
       });
     }
   }
 
-  // Calculate daily average across all available days with recorded data
+  // Count real measured days
   const recordedDays = Object.values(allRecords).filter((r) => r.steps > 0);
-  const totalRecordedSteps = recordedDays.reduce((acc, curr) => acc + curr.steps, 0);
-  const dailyAverage = recordedDays.length > 0 ? Math.round(totalRecordedSteps / recordedDays.length) : todayRecord.steps;
+  const realDays = recordedDays.filter((r) => !r.isDemoData);
+  const hasOnlyDemoData = recordedDays.length > 0 && realDays.length === 0;
+
+  // Daily average: calculated only from real days if real days exist, or recorded days
+  const daysForAverage = realDays.length > 0 ? realDays : recordedDays;
+  const totalSteps = daysForAverage.reduce((acc, curr) => acc + curr.steps, 0);
+  const dailyAverage = daysForAverage.length > 0 ? Math.round(totalSteps / daysForAverage.length) : todayRecord.steps;
 
   // Best day
-  let bestDay: { date: string; steps: number } | null = null;
+  let bestDay: { date: string; steps: number; isDemoData?: boolean } | null = null;
   for (const record of Object.values(allRecords)) {
-    if (!bestDay || record.steps > bestDay.steps) {
+    if (record.steps > 0 && (!bestDay || record.steps > bestDay.steps)) {
       bestDay = {
         date: record.date,
         steps: record.steps,
+        isDemoData: record.isDemoData,
       };
     }
   }
@@ -253,5 +286,7 @@ export function getHistoryStats(profile: UserProfile = DEFAULT_PROFILE): History
     thirtyDayHistory: thirtyDays,
     dailyAverage,
     bestDay,
+    hasOnlyDemoData,
+    totalRealDaysRecorded: realDays.length,
   };
 }

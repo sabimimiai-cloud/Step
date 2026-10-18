@@ -7,6 +7,7 @@ interface SettingsModalProps {
   onClose: () => void;
   profile: UserProfile;
   onSaveProfile: (profile: UserProfile) => void;
+  onResetAllData?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -14,6 +15,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   profile,
   onSaveProfile,
+  onResetAllData,
 }) => {
   const [goal, setGoal] = useState(profile.dailyGoal);
   const [weightKg, setWeightKg] = useState(profile.weightKg);
@@ -168,21 +170,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-zinc-800 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-5 py-2 bg-emerald-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-emerald-400 transition-colors shadow-sm"
-          >
-            Save Changes
-          </button>
+        <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
+          {onResetAllData ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Reset all step history and today counts to 0?')) {
+                  onResetAllData();
+                  onClose();
+                }
+              }}
+              className="text-[11px] text-rose-400 hover:text-rose-300 font-medium"
+            >
+              Reset All History
+            </button>
+          ) : (
+            <span />
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-5 py-2 bg-emerald-500 text-zinc-950 font-bold text-xs rounded-xl hover:bg-emerald-400 transition-colors shadow-sm"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
     </div>

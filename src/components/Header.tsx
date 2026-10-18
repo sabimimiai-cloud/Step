@@ -1,9 +1,11 @@
 import React from 'react';
-import { History, Settings, Info, Activity, Footprints, ShieldAlert } from 'lucide-react';
-import { SensorStatus } from '../types';
+import { History, Settings, Info, Activity, Footprints, ShieldAlert, Smartphone } from 'lucide-react';
+import { PedometerCapabilities, PedometerProviderType, SensorStatus } from '../types';
 
 interface HeaderProps {
   status: SensorStatus;
+  providerType: PedometerProviderType;
+  capabilities: PedometerCapabilities;
   cadenceSpm: number;
   isSimulated: boolean;
   onOpenHistory: () => void;
@@ -14,6 +16,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   status,
+  capabilities,
   cadenceSpm,
   isSimulated,
   onOpenHistory,
@@ -23,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="w-full flex items-center justify-between py-4 px-4 sm:px-6 max-w-md mx-auto">
-      {/* Brand & Logo */}
+      {/* Brand & Active Sensor Provider */}
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm">
           <Footprints className="w-5 h-5" />
@@ -32,12 +35,16 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-base tracking-tight text-zinc-100">StepFlow</span>
             {isSimulated && (
-              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
                 Simulated
               </span>
             )}
           </div>
-          <p className="text-[11px] text-zinc-500 font-medium">Motion Step Engine</p>
+          <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
+            <span>{capabilities.sensorName.split(' ')[0]}</span>
+            <span>·</span>
+            <span>{capabilities.supportsBackgroundTracking ? '24/7 BG' : 'Foreground'}</span>
+          </div>
         </div>
       </div>
 
@@ -59,13 +66,16 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-medium hover:bg-amber-500/30 transition-colors"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Enable Sensor</span>
+            <span>Authorize</span>
           </button>
         ) : status === 'unsupported' ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/70 border border-zinc-700 text-zinc-400 text-xs">
-            <Activity className="w-3.5 h-3.5 text-zinc-500" />
+          <button
+            onClick={onOpenInfo}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/70 border border-zinc-700 text-zinc-400 text-xs hover:text-white"
+          >
+            <Smartphone className="w-3 h-3 text-zinc-500" />
             <span>No Sensor</span>
-          </div>
+          </button>
         ) : null}
 
         {/* Action icons */}

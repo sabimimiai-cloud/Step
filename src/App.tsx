@@ -1,14 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
-import { getStepEngine } from './services/stepDetectionEngine';
+import { getPedometerManager } from './services/pedometer/PedometerManager';
 import {
   getStoredProfile,
   saveProfile,
   getTodayRecord,
   updateTodaySteps,
   getHistoryStats,
+  loadDemoBenchmarkData,
+  purgeDemoData,
+  resetAllHistory,
 } from './services/storage';
 import { calculateEstimations } from './utils/calculations';
-import { MotionSample, SensorStatus, StepEngineState, UserProfile } from './types';
+import { MotionSample, PedometerProviderType, SensorStatus, StepEngineState, UserProfile } from './types';
 
 // Components
 import { Header } from './components/Header';
@@ -21,109 +24,120 @@ import { HistoryModal } from './components/HistoryModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ActiveWalkModal } from './components/ActiveWalkModal';
 import { ArchitectureModal } from './components/ArchitectureModal';
-import { Footprints, Play } from 'lucide-react';
+import { Footprints, Play, Smartphone } from 'lucide-react';
 
 export default function App() {
-  // 1. User Profile & Settings
+  // 1. User Profile
   const [profile, setProfile] = useState<UserProfile>(() => getStoredProfile());
 
-  // 2. Engine and Sensor State
-  const [engineState, setEngineState] = useState<StepEngineState>(() => {
+  // 2. Manager and State
+  const [manager] = useState(() => {
     const today = getTodayRecord(profile);
-    const engine = getStepEngine(today.steps);
-    return engine.getState();
+    return getPedometerManager(today.steps);
   });
 
-  // 3. Today's Steps and Walking Session
-  const [todaySteps, setTodaySteps] = useState<number>(() => {
-    return getTodayRecord(profile).steps;
-  });
-
+  const [engineState, setEngineState] = useState<StepEngineState>(() => manager.getState());
+  const [todaySteps, setTodaySteps] = useState<number>(() => getTodayRecord(profile).steps);
   const [samples, setSamples] = useState<MotionSample[]>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
 
-  // 4. Modals State
+  // 3. Modals State
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isActiveWalkOpen, setIsActiveWalkOpen] = useState(false);
 
-  // Initialize engine subscription and persistence
+  // Initialize pedometer tracking and event subscriptions
   useEffect(() => {
-    const engine = getStepEngine(todaySteps);
+    manager.initialize();
 
-    // Subscribe to state changes (status, cadence, walking mode)
-    const unsubState = engine.subscribeToStateChange((state) => {
+    const unsubState = manager.onState((state) => {
       setEngineState(state);
     });
 
-    // Subscribe to real-time step events
-    const unsubSteps = engine.subscribeToSteps((newTotalSteps) => {
-      setTodaySteps(newTotalSteps);
-      // Persist to storage
-      updateTodaySteps(newTotalSteps, 0, profile);
+    const unsubSteps = manager.onStep((update) => {
+      setTodaySteps(update.totalStepsToday);
+      updateTodaySteps(update.totalStepsToday, 0, profile);
+      setHistoryVersion((v) => v + 1);
     });
 
-    // Subscribe to live motion samples for the waveform monitor
-    const unsubSamples = engine.subscribeToSamples((sample) => {
+    const unsubSamples = manager.onSample((sample) => {
       setSamples((prev) => {
         const next = [...prev, sample];
         return next.length > 60 ? next.slice(-60) : next;
       });
     });
 
-    // Automatically start listening if already granted or ready
-    if (engineState.sensorStatus === 'listening_stationary' || engineState.sensorStatus === 'listening_walking') {
-      engine.startListening();
-    }
+    manager.startTracking();
 
     return () => {
       unsubState();
       unsubSteps();
       unsubSamples();
     };
-  }, [profile]);
+  }, [manager, profile]);
 
-  // Handle sensor permission request (vital for iOS 13+ Safari user gestures)
+  // Request sensor permissions
   const handleRequestPermission = async () => {
-    const engine = getStepEngine();
-    await engine.requestSensorPermission();
+    await manager.requestPermission();
   };
 
-  // Toggle desktop simulation testing mode
+  // Toggle desktop simulator
   const handleToggleSimulator = () => {
-    const engine = getStepEngine();
     if (engineState.isSimulatedDesktop) {
-      engine.stopSimulation();
+      manager.stopSimulator();
     } else {
-      engine.startDesktopMotionSimulator(105);
+      manager.startSimulator(105);
     }
   };
 
-  // Save profile updates
+  // Switch active pedometer provider (iOS CoreMotion, Android Sensor, or Web Accelerometer)
+  const handleSwitchProvider = async (type: PedometerProviderType) => {
+    await manager.switchProvider(type);
+    setEngineState(manager.getState());
+  };
+
+  // Demo Data handlers
+  const handleLoadDemoData = () => {
+    loadDemoBenchmarkData(profile);
+    setHistoryVersion((v) => v + 1);
+  };
+
+  const handlePurgeDemoData = () => {
+    purgeDemoData();
+    setHistoryVersion((v) => v + 1);
+  };
+
+  const handleResetAllData = () => {
+    resetAllHistory(profile);
+    setTodaySteps(0);
+    manager.setTodaySteps(0);
+    setHistoryVersion((v) => v + 1);
+  };
+
+  // Profile save
   const handleSaveProfile = (newProfile: UserProfile) => {
     setProfile(newProfile);
     saveProfile(newProfile);
   };
 
-  // Estimated metrics calculated from live steps
+  // Calculations
   const estimatedMetrics = useMemo(() => {
-    return calculateEstimations(
-      todaySteps,
-      profile.strideLengthMeters,
-      profile.weightKg
-    );
+    return calculateEstimations(todaySteps, profile.strideLengthMeters, profile.weightKg);
   }, [todaySteps, profile.strideLengthMeters, profile.weightKg]);
 
-  // Consolidated history statistics
   const historyStats = useMemo(() => {
     return getHistoryStats(profile);
-  }, [todaySteps, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todaySteps, profile, historyVersion]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-black">
-      {/* Top Navigation */}
+      {/* Top Header */}
       <Header
         status={engineState.sensorStatus as SensorStatus}
+        providerType={engineState.providerType}
+        capabilities={engineState.capabilities}
         cadenceSpm={engineState.cadenceSpm}
         isSimulated={Boolean(engineState.isSimulatedDesktop)}
         onOpenHistory={() => setIsHistoryOpen(true)}
@@ -134,9 +148,11 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col justify-center py-2">
-        {/* Contextual Sensor Banner (Permissions, Desktop Check, Limitations) */}
+        {/* Sensor Status & Background Limitation Banner */}
         <SensorStatusBanner
           status={engineState.sensorStatus as SensorStatus}
+          providerType={engineState.providerType}
+          capabilities={engineState.capabilities}
           isSimulated={Boolean(engineState.isSimulatedDesktop)}
           onRequestPermission={handleRequestPermission}
           onToggleSimulator={handleToggleSimulator}
@@ -178,7 +194,7 @@ export default function App() {
             className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-zinc-950 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
           >
             <Play className="w-4 h-4 fill-current" />
-            <span>Start Active Walk (Screen Awake)</span>
+            <span>Active Walk Mode (Screen Awake)</span>
           </button>
 
           <button
@@ -190,14 +206,17 @@ export default function App() {
           </button>
         </div>
 
-        {/* Subtle Architecture & Transparency Footer Tag */}
+        {/* Footer Technical Attribution */}
         <div className="mt-2.5 flex items-center justify-between text-[10px] text-zinc-600 px-1 font-mono">
-          <span>StepFlow Sensor v2.4</span>
+          <div className="flex items-center gap-1">
+            <Smartphone className="w-3 h-3" />
+            <span>{engineState.capabilities.sensorName.split(' ')[0]} Engine</span>
+          </div>
           <button
             onClick={() => setIsInfoOpen(true)}
             className="hover:text-zinc-400 underline decoration-zinc-800 underline-offset-2"
           >
-            Web vs Native Specs
+            Technical Audit &amp; Native Bridge
           </button>
         </div>
       </footer>
@@ -208,6 +227,8 @@ export default function App() {
         onClose={() => setIsHistoryOpen(false)}
         stats={historyStats}
         profile={profile}
+        onLoadDemoData={handleLoadDemoData}
+        onPurgeDemoData={handlePurgeDemoData}
       />
 
       <SettingsModal
@@ -215,6 +236,7 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         profile={profile}
         onSaveProfile={handleSaveProfile}
+        onResetAllData={handleResetAllData}
       />
 
       <ActiveWalkModal
@@ -231,6 +253,9 @@ export default function App() {
       <ArchitectureModal
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
+        activeProviderType={engineState.providerType}
+        capabilities={engineState.capabilities}
+        onSwitchProvider={handleSwitchProvider}
       />
     </div>
   );

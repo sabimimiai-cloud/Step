@@ -1,17 +1,29 @@
-import React from 'react';
-import { X, Cpu, Smartphone, ShieldCheck, BatteryCharging, AlertCircle, Layers } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Cpu, Smartphone, ShieldCheck, BatteryCharging, AlertCircle, Layers, CheckCircle, Code } from 'lucide-react';
+import { PedometerCapabilities, PedometerProviderType } from '../types';
 
 interface ArchitectureModalProps {
   isOpen: boolean;
   onClose: () => void;
+  activeProviderType: PedometerProviderType;
+  capabilities: PedometerCapabilities;
+  onSwitchProvider: (type: PedometerProviderType) => void;
 }
 
-export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, onClose }) => {
+export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({
+  isOpen,
+  onClose,
+  activeProviderType,
+  capabilities,
+  onSwitchProvider,
+}) => {
+  const [activeTab, setActiveTab] = useState<'audit' | 'ios' | 'android' | 'web'>('audit');
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
+      <div className="relative w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 overflow-hidden flex flex-col max-h-[92vh] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
@@ -19,8 +31,8 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
               <Cpu className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight">StepFlow Architecture &amp; Sensor Specifications</h2>
-              <p className="text-xs text-zinc-400">Technical audit of Web vs Native Pedometer capabilities</p>
+              <h2 className="text-base font-bold text-white tracking-tight">StepFlow Technical Audit &amp; Native Bridge</h2>
+              <p className="text-xs text-zinc-400">Sensor accuracy, background limitations &amp; native pedometer specs</p>
             </div>
           </div>
           <button
@@ -31,108 +43,231 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 py-4 space-y-4 text-xs leading-relaxed text-zinc-300 pr-1">
-          {/* Question 1: Platform */}
-          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
-              <Smartphone className="w-4 h-4" />
-              <span>1. Current Platform Target</span>
-            </div>
-            <p className="text-zinc-400">
-              This environment runs as a <strong>Mobile-first Web Application (React 19, TypeScript, Tailwind CSS)</strong> executed inside modern mobile and desktop web browsers (Safari, Chrome, Firefox, Edge).
-            </p>
-          </div>
+        {/* Tab Selector */}
+        <div className="flex gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl my-3 shrink-0">
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              activeTab === 'audit' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Audit &amp; Truth
+          </button>
+          <button
+            onClick={() => setActiveTab('ios')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              activeTab === 'ios' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            iOS CoreMotion
+          </button>
+          <button
+            onClick={() => setActiveTab('android')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              activeTab === 'android' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Android Sensor
+          </button>
+          <button
+            onClick={() => setActiveTab('web')}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              activeTab === 'web' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Web Provider
+          </button>
+        </div>
 
-          {/* Question 2: Sensor Access */}
-          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
-              <Layers className="w-4 h-4" />
-              <span>2. Access to Real Step / Motion Sensors</span>
-            </div>
-            <ul className="space-y-1.5 text-zinc-400 list-disc pl-4 mt-1">
-              <li>
-                <strong>Web Browser reality:</strong> Web browsers do not expose dedicated OS hardware pedometer counters (like Apple CoreMotion <code className="text-zinc-300 font-mono">CMPedometer</code> or Android <code className="text-zinc-300 font-mono">TYPE_STEP_COUNTER</code>).
-              </li>
-              <li>
-                <strong>What StepFlow implements:</strong> StepFlow binds to raw 3D accelerometer signals via the W3C <code className="text-zinc-300 font-mono">DeviceMotionEvent</code> API. Our physics engine calculates Euclidean acceleration magnitude, filters static gravity (9.81 m/s²), applies low-pass smoothing, and detects cyclic biomechanical gait peaks (1.4 to 3.2 Hz).
-              </li>
-            </ul>
-          </div>
-
-          {/* Question 3: Background Tracking */}
-          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
-              <AlertCircle className="w-4 h-4" />
-              <span>3. Background / Screen-Locked Limitations</span>
-            </div>
-            <p className="text-zinc-400">
-              <strong>Crucial Distinction:</strong> In all mobile browsers (Safari on iOS &amp; Chrome on Android), when the phone is locked or the tab goes into the background, JavaScript execution is aggressively frozen by the OS, and motion sensor events cease immediately.
-            </p>
-            <p className="text-zinc-400 mt-2">
-              StepFlow solves this in the web environment via:
-            </p>
-            <ul className="space-y-1 text-zinc-400 list-disc pl-4 mt-1">
-              <li>
-                <strong>Screen Wake Lock API:</strong> Keeps the display alive in high-efficiency OLED dark mode during active walking sessions.
-              </li>
-              <li>
-                <strong>Honest State Reporting:</strong> We never fabricate fake phantom steps when the screen is locked.
-              </li>
-            </ul>
-          </div>
-
-          {/* Question 4: Native APIs Required */}
-          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-sky-400 font-semibold mb-1">
-              <ShieldCheck className="w-4 h-4" />
-              <span>4. Native APIs Required for 24/7 Locked Background Counting</span>
-            </div>
-            <div className="space-y-2 mt-1">
-              <div className="bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
-                <span className="font-semibold text-zinc-200">iOS (Swift / Objective-C):</span>
-                <p className="text-zinc-400 mt-0.5">
-                  <code className="text-sky-300 font-mono">CoreMotion.CMPedometer</code> queries Apple’s low-power M-series motion coprocessor. Background tracking requires <code className="text-sky-300 font-mono">HealthKit (HKQuantityTypeIdentifierStepCount)</code> or background location/audio entitlements.
+        {/* Tab Content */}
+        <div className="overflow-y-auto flex-1 space-y-4 text-xs leading-relaxed text-zinc-300 pr-1">
+          {activeTab === 'audit' && (
+            <div className="space-y-3">
+              {/* Question: Can web count backgrounded? */}
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-rose-400 font-semibold mb-1">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Can Browser Count When Locked or Backgrounded?</span>
+                </div>
+                <p className="text-zinc-300 font-medium mt-1">
+                  <strong>Answer: NO.</strong> Web standards do not permit background pedometer counting.
+                </p>
+                <p className="text-zinc-400 mt-1">
+                  In iOS Safari and Android Chrome, the operating system forcibly suspends the JavaScript runtime and shuts down <code className="text-zinc-300 font-mono">devicemotion</code> event listeners the moment the phone is locked, the tab is switched, or another app is opened. No browser-only implementation can bypass this OS limitation.
                 </p>
               </div>
-              <div className="bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800">
-                <span className="font-semibold text-zinc-200">Android (Kotlin / Java):</span>
-                <p className="text-zinc-400 mt-0.5">
-                  <code className="text-sky-300 font-mono">android.hardware.Sensor.TYPE_STEP_COUNTER</code> running inside an Android Foreground Service with <code className="text-sky-300 font-mono">FOREGROUND_SERVICE_TYPE_HEALTH</code> and <code className="text-sky-300 font-mono">ACTIVITY_RECOGNITION</code> permission, or Google Health Connect.
-                </p>
-              </div>
-            </div>
-          </div>
 
-          {/* Question 5: Web vs Native Partition */}
-          <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
-              <BatteryCharging className="w-4 h-4" />
-              <span>5. Web vs Native Implementation Partition</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-              <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                <span className="font-semibold text-emerald-400">Directly in this Web App:</span>
-                <ul className="list-disc pl-3 text-zinc-400 mt-1 space-y-0.5">
-                  <li>Full fitness UI &amp; charts</li>
-                  <li>Real-time DeviceMotion peak detection</li>
-                  <li>Hysteresis gait period validation</li>
-                  <li>WakeLock active walking mode</li>
-                  <li>Local storage daily persistence</li>
-                  <li>Diagnostic live waveform canvas</li>
-                </ul>
+              {/* What is Real vs What was Seeded */}
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>Real Sensor Measurements vs Demo Data Audit</span>
+                </div>
+                <div className="space-y-2 text-zinc-400">
+                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <span className="text-emerald-400 font-semibold">100% Real Sensor Measurements:</span>
+                    <p className="mt-0.5">
+                      • When this page is open in the foreground on a phone with motion permissions enabled, raw 3D accelerometer signals are continuously captured via <code className="text-zinc-300 font-mono">DeviceMotionEvent</code>.<br />
+                      • The 3D Euclidean magnitude, gravity filtering (9.81 m/s²), dynamic residual, and peak-trough hysteresis detection run exclusively on authentic physical forces.<br />
+                      • Today’s step count strictly increments only upon genuine gait strides.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <span className="text-amber-400 font-semibold">Demo Data Purge &amp; Labeling:</span>
+                    <p className="mt-0.5">
+                      • All automatically seeded synthetic historical days have been <strong>purged</strong>. Fresh app installations now start with authentic 0-step empty history.<br />
+                      • Optional test benchmarks can be toggled in the History screen, but are explicitly watermarked with <code className="text-amber-300 font-mono">[DEMO DATA - NOT MEASURED]</code> so no synthetic data is ever misrepresented.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                <span className="font-semibold text-zinc-300">Requires Native Bridge (Capacitor/RN):</span>
-                <ul className="list-disc pl-3 text-zinc-400 mt-1 space-y-0.5">
-                  <li>Locked screen 24/7 background counting</li>
-                  <li>Coprocessor hardware step buffer</li>
-                  <li>Apple Health / Google Fit sync</li>
-                  <li>Zero-battery hardware step events</li>
-                </ul>
+
+              {/* Active Provider Status */}
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <span className="text-zinc-400 font-medium">Active Runtime Provider:</span>
+                <div className="flex items-center justify-between mt-1 pt-1 border-t border-zinc-800">
+                  <span className="font-mono text-white font-semibold">{capabilities.sensorName}</span>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
+                      capabilities.supportsBackgroundTracking
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                    }`}
+                  >
+                    {capabilities.supportsBackgroundTracking ? '24/7 Background Supported' : 'Foreground Only'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-2">{capabilities.limitationNotice}</p>
               </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === 'ios' && (
+            <div className="space-y-3">
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-sky-400 font-semibold mb-1">
+                  <Smartphone className="w-4 h-4" />
+                  <span>Production iOS Architecture: CMPedometer</span>
+                </div>
+                <p className="text-zinc-400">
+                  On iOS, reliable 24/7 background step counting uses Apple’s <strong>CoreMotion</strong> framework and its dedicated low-power M-series motion coprocessor.
+                </p>
+                <div className="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300 overflow-x-auto">
+                  <pre>{`// Swift (Capacitor / Native Plugin Bridge)
+import CoreMotion
+
+class PedometerPlugin {
+  let pedometer = CMPedometer()
+
+  func startTracking() {
+    guard CMPedometer.isStepCountingAvailable() else { return }
+    pedometer.startUpdates(from: Date()) { data, error in
+      guard let data = data, error == nil else { return }
+      self.notifyListeners("stepUpdate", data: [
+        "numberOfSteps": data.numberOfSteps.intValue,
+        "currentCadence": data.currentCadence?.doubleValue ?? 0
+      ])
+    }
+  }
+
+  // 24/7 coprocessor query for past days
+  func queryHistorical(start: Date, end: Date) {
+    pedometer.queryPedometerData(from: start, to: end) { ... }
+  }
+}`}</pre>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[11px] text-zinc-400">Switch runtime to iOS CoreMotion bridge:</span>
+                  <button
+                    onClick={() => onSwitchProvider('ios_coremotion')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
+                      activeProviderType === 'ios_coremotion'
+                        ? 'bg-sky-500 text-black border-sky-400'
+                        : 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {activeProviderType === 'ios_coremotion' ? 'Active Provider' : 'Select Provider'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'android' && (
+            <div className="space-y-3">
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
+                  <Smartphone className="w-4 h-4" />
+                  <span>Production Android Architecture: TYPE_STEP_COUNTER</span>
+                </div>
+                <p className="text-zinc-400">
+                  On Android, production step counting runs in an Android <strong>Foreground Service</strong> using <code className="text-zinc-300 font-mono">Sensor.TYPE_STEP_COUNTER</code> and <code className="text-zinc-300 font-mono">ACTIVITY_RECOGNITION</code> permission.
+                </p>
+                <div className="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300 overflow-x-auto">
+                  <pre>{`// Kotlin Android Foreground Service
+class StepCounterService : Service(), SensorEventListener {
+  override fun onSensorChanged(event: SensorEvent) {
+    if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
+      val totalSteps = event.values[0].toInt()
+      // Broadcast to WebView bridge
+      bridge.dispatchStepEvent(totalSteps)
+    }
+  }
+
+  // Mandatory Android 14+ Health service type
+  // <service android:foregroundServiceType="health" />
+}`}</pre>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[11px] text-zinc-400">Switch runtime to Android Sensor bridge:</span>
+                  <button
+                    onClick={() => onSwitchProvider('android_sensor')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
+                      activeProviderType === 'android_sensor'
+                        ? 'bg-emerald-500 text-black border-emerald-400'
+                        : 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {activeProviderType === 'android_sensor' ? 'Active Provider' : 'Select Provider'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'web' && (
+            <div className="space-y-3">
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+                  <Layers className="w-4 h-4" />
+                  <span>Web DeviceMotionEvent Fallback</span>
+                </div>
+                <p className="text-zinc-400">
+                  Processes raw 3-axis accelerometer forces while the browser tab is in the foreground. Automatically pauses kinematic processing when stationary to preserve battery.
+                </p>
+                <div className="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-400 space-y-1">
+                  <div>• <strong>Supports Background:</strong> No (OS restriction)</div>
+                  <div>• <strong>Physical Sensor:</strong> Yes (3D Accelerometer via devicemotion)</div>
+                  <div>• <strong>Cadence Validation:</strong> 1.4 Hz to 3.2 Hz gait rhythm buffer</div>
+                  <div>• <strong>Screen Wake Lock:</strong> Supported via Active Walk mode</div>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[11px] text-zinc-400">Switch runtime to Web Accelerometer:</span>
+                  <button
+                    onClick={() => onSwitchProvider('web_accelerometer')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${
+                      activeProviderType === 'web_accelerometer'
+                        ? 'bg-amber-500 text-black border-amber-400'
+                        : 'bg-zinc-800 text-zinc-200 border-zinc-700 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {activeProviderType === 'web_accelerometer' ? 'Active Provider' : 'Select Provider'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -141,7 +276,7 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
             onClick={onClose}
             className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs rounded-xl transition-colors"
           >
-            Close Specification
+            Close Audit
           </button>
         </div>
       </div>

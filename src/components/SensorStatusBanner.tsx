@@ -1,9 +1,11 @@
 import React from 'react';
-import { ShieldAlert, AlertTriangle, Smartphone, Compass, Sparkles } from 'lucide-react';
-import { SensorStatus } from '../types';
+import { ShieldAlert, Smartphone, Compass, Sparkles, AlertCircle, Zap } from 'lucide-react';
+import { PedometerCapabilities, PedometerProviderType, SensorStatus } from '../types';
 
 interface SensorStatusBannerProps {
   status: SensorStatus;
+  providerType: PedometerProviderType;
+  capabilities: PedometerCapabilities;
   isSimulated: boolean;
   onRequestPermission: () => void;
   onToggleSimulator: () => void;
@@ -13,13 +15,14 @@ interface SensorStatusBannerProps {
 
 export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
   status,
+  capabilities,
   isSimulated,
   onRequestPermission,
   onToggleSimulator,
   onOpenInfo,
   onStartWalkMode,
 }) => {
-  // If permission needs to be requested (iOS Safari or Android prompt)
+  // If permission needs to be requested
   if (status === 'needs_permission') {
     return (
       <div className="w-full max-w-md mx-auto px-4 sm:px-6 mb-4">
@@ -31,7 +34,7 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
             <div className="flex-1">
               <h4 className="text-sm font-semibold text-amber-200">Motion Sensor Permission Required</h4>
               <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">
-                StepFlow relies directly on your phone’s accelerometer to detect walking biomechanics in real time. We do not use fake timers or approximations.
+                StepFlow relies directly on your phone’s physical accelerometer to detect walking biomechanics in real time. We do not use fake timers or approximations.
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <button
@@ -66,7 +69,7 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
             <div className="flex-1">
               <h4 className="text-sm font-semibold text-rose-200">Sensor Permission Denied</h4>
               <p className="text-xs text-rose-300/80 mt-1 leading-relaxed">
-                Sensor access was blocked. To count steps, please open Safari Settings &gt; Motion &amp; Orientation Access, or enable sensors in your browser’s site permissions.
+                Sensor access was blocked by the browser. To count steps, please open Safari Settings &gt; Motion &amp; Orientation Access, or enable sensors in your browser’s site permissions.
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <button
@@ -89,7 +92,7 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
     );
   }
 
-  // If hardware accelerometer is unsupported (e.g. desktop computer)
+  // If hardware accelerometer is unsupported (e.g. desktop)
   if (status === 'unsupported' && !isSimulated) {
     return (
       <div className="w-full max-w-md mx-auto px-4 sm:px-6 mb-4">
@@ -100,11 +103,11 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-zinc-200">Desktop Environment Detected</h4>
+                <h4 className="text-sm font-semibold text-zinc-200">Desktop / No Motion Hardware</h4>
                 <span className="text-[10px] font-mono text-zinc-500 uppercase">Hardware Check</span>
               </div>
               <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                StepFlow uses real phone accelerometer sensors. Because this desktop device lacks a mobile pedometer, live steps will not increment until you move on mobile or activate the Kinematic Walk Simulator below.
+                StepFlow uses real device accelerometer sensors. Because this computer has no physical pedometer hardware, step detection is idle until you open this page on your mobile phone or run the testing sandbox below.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
@@ -118,7 +121,7 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
                   onClick={onOpenInfo}
                   className="px-2.5 py-1.5 text-zinc-400 hover:text-white text-xs"
                 >
-                  View Tech Architecture
+                  Native Architecture Specs
                 </button>
               </div>
             </div>
@@ -128,7 +131,7 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
     );
   }
 
-  // If simulation is running on desktop
+  // If simulation is running
   if (isSimulated) {
     return (
       <div className="w-full max-w-md mx-auto px-4 sm:px-6 mb-4">
@@ -151,20 +154,33 @@ export const SensorStatusBanner: React.FC<SensorStatusBannerProps> = ({
     );
   }
 
-  // Normal running state: subtle walk session trigger + background limitation indicator
+  // Active status: Display explicit platform background capability notice
   return (
-    <div className="w-full max-w-md mx-auto px-4 sm:px-6 mb-3">
+    <div className="w-full max-w-md mx-auto px-4 sm:px-6 mb-3 space-y-2">
+      {/* Background tracking capability status */}
+      {!capabilities.supportsBackgroundTracking && (
+        <div className="px-3.5 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-[11px] text-zinc-400 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="leading-tight">
+            <span className="text-zinc-200 font-medium">Foreground Sensor Tracking Only: </span>
+            <span>
+              Browsers suspend motion events when locked or backgrounded. Use <strong>Active Walk Mode</strong> to keep the screen awake, or review our Native iOS/Android bridge.
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between text-xs text-zinc-500 px-1">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>Motion sensors active &amp; ready</span>
+          <span>{capabilities.sensorName} ready</span>
         </div>
         <button
           onClick={onStartWalkMode}
           className="text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1"
         >
-          <span>Active Walk Mode</span>
-          <span>→</span>
+          <Zap className="w-3.5 h-3.5" />
+          <span>Active Walk Mode →</span>
         </button>
       </div>
     </div>
